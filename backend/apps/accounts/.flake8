@@ -1,0 +1,6 @@
+[flake8]
+max-line-length = 119
+select = C,E,F,W,B,B950,N
+ignore = E203,E501,W503
+exclude = .git,__pycache__,*/migrations/*
+max_complexity=3

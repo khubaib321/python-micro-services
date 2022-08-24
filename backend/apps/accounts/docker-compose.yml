@@ -1,0 +1,31 @@
+version: "3"
+
+volumes:
+  pg_data:
+
+services:
+  postgres:
+    image: postgres:14.5
+    volumes:
+      - pg_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_DB: accounts
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+    container_name: accounts-postgres
+
+  app:
+    build: .
+    depends_on:
+      - postgres
+    volumes:
+      - .:/src
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
+    restart: unless-stopped
+    container_name: accounts-app
