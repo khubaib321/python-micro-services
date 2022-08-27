@@ -1,47 +1,79 @@
 import os
 
 from invoke import task
+from invoke.context import Context
 
 DOCKERFILE_NAME = "Dockerfile"
 COMPOSEFILE_NAME = "docker-compose.yml"
 
-BASE_DIR = os.path.join(os.path.dirname(__file__))
-ACCOUNTS_DIR = os.path.join(BASE_DIR, "apps/accounts")
+BACKEND_DIR = os.path.join(os.path.dirname(__file__))
+ACCOUNTS_DIR = os.path.join(BACKEND_DIR, "apps", "accounts")
 
 
-def run_command(c, cmd):
-    print("CMD => %s" % cmd)
-    c.run(cmd, pty=True)
+def run_commands(c: Context, cmds):
+    if cmds and not type(cmds) in [list]:
+        cmds = [cmds]
+
+    for cmd in cmds:
+        print("CMD => %s" % cmd)
+        c.run(cmd, pty=True)
 
 
-def run_accounts(c, detach=True, rebuild=False):
-    run_command(c, f"cd {ACCOUNTS_DIR}")
+def create_venv(c: Context, build):
+    if build:
+        run_commands(c, "rm -rf .venv")
+        run_commands(c, "python3 -m venv .venv")
 
-    cmd = f"docker-compose -f {ACCOUNTS_DIR}/{COMPOSEFILE_NAME}"
+    run_commands(c, "source .venv/bin/activate")
 
-    if rebuild:
-        down_cmd = cmd + " down --remove-orphans"
-        run_command(c, down_cmd)
+    reqs_path = os.path.join(ACCOUNTS_DIR, "requirements.txt")
+    install_cmd = f"pip3 install -r {reqs_path}"
 
-    up_cmd = cmd + " up"
+    run_commands(c, install_cmd)
+
+
+def get_run_commands(base_cmd, detach, build):
+    commands = []
+
+    down_cmd = base_cmd + " down --remove-orphans"
+    commands.append(down_cmd)
+
+    if build:
+        build_cmd = base_cmd + " build"
+        commands.append(build_cmd)
+
+    up_cmd = base_cmd + " up"
 
     if detach:
         up_cmd += " --detach"
 
-    run_command(c, up_cmd)
+    commands.append(up_cmd)
+
+    return commands
+
+
+def run_accounts(c: Context, detach, build):
+    run_commands(c, f"cd {ACCOUNTS_DIR}")
+
+    compose_file_path = os.path.join(ACCOUNTS_DIR, COMPOSEFILE_NAME)
+
+    cmd = f"docker-compose -f {compose_file_path}"
+
+    cmds = get_run_commands(cmd, detach, build)
+
+    run_commands(c, cmds)
 
 
 @task
-def run(c, all=False, accounts=False, rebuild=False):
-    if all:
-        print("Running all services...")
-        run_accounts(c, rebuild=rebuild)
+def run(c: Context, accounts=False, build=False):
+    create_venv(c, build)
 
-    elif accounts:
+    if accounts:
         print("Running accounts service...")
-        run_accounts(c, rebuild=rebuild, detach=False)
+        run_accounts(c, detach=False, build=build)
 
     else:
-        print("Nothing to run!")
+        print("Running all services...")
+        run_accounts(c, detach=True, build=build)
 
     print("Done!")
